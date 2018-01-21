@@ -23,6 +23,7 @@
 #include <linux/dma-buf.h>
 #include <linux/pm_runtime.h>
 #include <linux/sw_sync.h>
+#include <linux/iommu.h>
 
 #include "mdp3_ctrl.h"
 #include "mdp3.h"
@@ -1173,6 +1174,16 @@ int mdp3_ctrl_reset(struct msm_fb_data_type *mfd)
 		mdp3_qos_remapper_setup(panel);
 	}
 
+	/*Map the splash addr for VIDEO mode panel before smmu attach*/
+	if ((mfd->panel.type == MIPI_VIDEO_PANEL) &&
+				(mdp3_session->in_splash_screen)) {
+		rc = mdss_smmu_map(MDSS_IOMMU_DOMAIN_UNSECURE,
+				mdp3_res->splash_mem_addr,
+				mdp3_res->splash_mem_addr,
+				mdp3_res->splash_mem_size,
+				IOMMU_READ | IOMMU_NOEXEC);
+	}
+
 	rc = mdp3_iommu_enable(MDP3_CLIENT_DMA_P);
 	if (rc) {
 		pr_err("fail to attach dma iommu\n");
@@ -1808,12 +1819,15 @@ static int mdp3_histogram_start(struct mdp3_session_data *session,
 	pr_debug("mdp3_histogram_start\n");
 
 	ret = mdp3_validate_start_req(req);
-	if (ret)
+	if (ret) {
+		mutex_unlock(&session->lock);
 		return ret;
+	}
 
 	if (!session->dma->histo_op ||
 		!session->dma->config_histo) {
 		pr_err("mdp3_histogram_start not supported\n");
+		mutex_unlock(&session->lock);
 		return -EINVAL;
 	}
 
@@ -1822,6 +1836,7 @@ static int mdp3_histogram_start(struct mdp3_session_data *session,
 	if (session->histo_status) {
 		pr_info("mdp3_histogram_start already started\n");
 		mutex_unlock(&session->histo_lock);
+		mutex_unlock(&session->lock);
 		return 0;
 	}
 
@@ -2837,6 +2852,7 @@ int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 	mdp3_interface->lut_update = NULL;
 	mdp3_interface->configure_panel = mdp3_update_panel_info;
 	mdp3_interface->input_event_handler = NULL;
+	mdp3_interface->signal_retire_fence = NULL;
 
 	mdp3_session = kzalloc(sizeof(struct mdp3_session_data), GFP_KERNEL);
 	if (!mdp3_session) {
