@@ -1033,6 +1033,15 @@ static void ep_pcie_release_resources(struct ep_pcie_dev_t *dev)
 
 static void ep_pcie_enumeration_complete(struct ep_pcie_dev_t *dev)
 {
+	unsigned long irqsave_flags;
+
+	spin_lock_irqsave(&dev->isr_lock, irqsave_flags);
+
+	if (dev->enumerated) {
+		EP_PCIE_DBG(dev, "PCIe V%d: Enumeration already done\n",
+				dev->rev);
+		goto done;
+	}
 	dev->enumerated = true;
 	dev->link_status = EP_PCIE_LINK_ENABLED;
 
@@ -1060,6 +1069,9 @@ static void ep_pcie_enumeration_complete(struct ep_pcie_dev_t *dev)
 		ep_pcie_dev.rev, hw_drv.device_id);
 	ep_pcie_register_drv(&hw_drv);
 	ep_pcie_notify_event(dev, EP_PCIE_EVENT_LINKUP);
+
+done:
+	spin_unlock_irqrestore(&dev->isr_lock, irqsave_flags);
 
 	return;
 }
@@ -2519,7 +2531,7 @@ static void __exit ep_pcie_exit(void)
 	platform_driver_unregister(&ep_pcie_driver);
 }
 
-module_init(ep_pcie_init);
+subsys_initcall(ep_pcie_init);
 module_exit(ep_pcie_exit);
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MSM PCIe Endpoint Driver");
