@@ -1276,23 +1276,6 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 
 	req->length = length;
 
-	/* throttle high/super speed IRQ rate back slightly */
-	if (gadget_is_dualspeed(dev->gadget) &&
-			 (dev->gadget->speed == USB_SPEED_HIGH ||
-			  dev->gadget->speed == USB_SPEED_SUPER)) {
-		spin_lock_irqsave(&dev->req_lock, flags);
-		dev->tx_qlen++;
-		if (dev->tx_qlen == MAX_TX_REQ_WITH_NO_INT) {
-			req->no_interrupt = 0;
-			dev->tx_qlen = 0;
-		} else {
-			req->no_interrupt = 1;
-		}
-		spin_unlock_irqrestore(&dev->req_lock, flags);
-	} else {
-		req->no_interrupt = 0;
-	}
-
 	if (skb_timestamp_enable) {
 		skb->tstamp = ktime_get();
 		clone = skb_clone_sk(skb);
