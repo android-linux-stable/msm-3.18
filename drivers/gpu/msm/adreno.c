@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -806,13 +806,13 @@ static int adreno_of_get_pwrlevels(struct adreno_device *adreno_dev,
 		struct device_node *parent)
 {
 	struct device_node *node, *child;
+	unsigned int bin = 0;
 
 	node = of_find_node_by_name(parent, "qcom,gpu-pwrlevel-bins");
 	if (node == NULL)
 		return adreno_of_get_legacy_pwrlevels(adreno_dev, parent);
 
 	for_each_child_of_node(node, child) {
-		unsigned int bin;
 
 		if (of_property_read_u32(child, "qcom,speed-bin", &bin))
 			continue;
@@ -828,6 +828,8 @@ static int adreno_of_get_pwrlevels(struct adreno_device *adreno_dev,
 		}
 	}
 
+	KGSL_CORE_ERR("GPU speed_bin:%d mismatch for efused bin:%d\n",
+			adreno_dev->speed_bin, bin);
 	return -ENODEV;
 }
 
@@ -953,6 +955,33 @@ adreno_ocmem_free(struct adreno_device *adreno_dev)
 }
 #endif
 
+static bool adreno_is_gpu_disabled(struct adreno_device *adreno_dev)
+{
+	unsigned int row0;
+	unsigned int pte_row0_msb[3];
+	int ret;
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+
+	if (of_property_read_u32_array(device->pdev->dev.of_node,
+		"qcom,gpu-disable-fuse", pte_row0_msb, 3))
+		return false;
+	/*
+	 * Read the fuse value to disable GPU driver if fuse
+	 * is blown. By default(fuse value is 0) GPU is enabled.
+	 */
+	if (adreno_efuse_map(adreno_dev))
+		return false;
+
+	ret = adreno_efuse_read_u32(adreno_dev, pte_row0_msb[0], &row0);
+	adreno_efuse_unmap(adreno_dev);
+
+	if (ret)
+		return false;
+
+	return (row0 >> pte_row0_msb[2]) &
+			pte_row0_msb[1] ? true : false;
+}
+
 static int adreno_probe(struct platform_device *pdev)
 {
 	struct kgsl_device *device;
@@ -968,6 +997,11 @@ static int adreno_probe(struct platform_device *pdev)
 
 	device = KGSL_DEVICE(adreno_dev);
 	device->pdev = pdev;
+
+	if (adreno_is_gpu_disabled(adreno_dev)) {
+		pr_err("adreno: GPU is disabled on this device");
+		return -ENODEV;
+	}
 
 	/* Get the chip ID from the DT and set up target specific parameters */
 	adreno_identify_gpu(adreno_dev);
