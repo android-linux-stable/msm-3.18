@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -320,6 +320,9 @@ static int k61_do_spi_transaction(struct k61_can *priv_data)
 	xfer = devm_kzalloc(&spi->dev, sizeof(*xfer), GFP_KERNEL);
 	if (xfer == 0 || msg == 0)
 		return -ENOMEM;
+	LOGDI(">%x %2d [%d] xfer_len:%d\n", priv_data->tx_buf[0],
+	      priv_data->tx_buf[1], priv_data->tx_buf[2],
+	      priv_data->xfer_length);
 	spi_message_init(msg);
 
 	spi_message_add_tail(xfer, msg);
@@ -329,13 +332,18 @@ static int k61_do_spi_transaction(struct k61_can *priv_data)
 	xfer->bits_per_word = priv_data->bits_per_word;
 
 	ret = spi_sync(spi, msg);
-	LOGDI("spi_sync ret %d\n", ret);
-
-	if (ret == 0) {
-		devm_kfree(&spi->dev, msg);
-		devm_kfree(&spi->dev, xfer);
+	LOGDI("spi_sync ret %d data %x %x %x %x %x %x %x %x\n", ret,
+	      priv_data->rx_buf[0], priv_data->rx_buf[1],
+	      priv_data->rx_buf[2], priv_data->rx_buf[3],
+	      priv_data->rx_buf[4], priv_data->rx_buf[5],
+	      priv_data->rx_buf[6], priv_data->rx_buf[7]);
+	LOGDI("priv_data->xfer_len: %d\n", priv_data->xfer_length);
+	if (ret == 0)
 		k61_process_rx(priv_data, priv_data->rx_buf);
-	}
+
+	devm_kfree(&spi->dev, msg);
+	devm_kfree(&spi->dev, xfer);
+
 	return ret;
 }
 
@@ -547,9 +555,22 @@ static int k61_frame_filter(struct net_device *netdev,
 	add_filter->mid = filter_request->mid;
 	add_filter->mask = filter_request->mask;
 
+	priv_data->wait_cmd = req->cmd;
+	priv_data->cmd_result = -1;
+	reinit_completion(&priv_data->response_completion);
+
 	ret = k61_do_spi_transaction(priv_data);
 	devm_kfree(&spi->dev, filter_request);
 	mutex_unlock(&priv_data->spi_lock);
+
+	if (ret == 0) {
+		LOGDI("k61_do_blocking_ioctl ready to wait for response\n");
+		wait_for_completion_interruptible_timeout(
+					&priv_data->response_completion,
+					1.5 * HZ);
+		ret = priv_data->cmd_result;
+	}
+
 	return ret;
 }
 
