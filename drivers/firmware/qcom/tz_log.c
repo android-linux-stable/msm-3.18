@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2017,2019 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -835,6 +835,9 @@ static ssize_t tzdbgfs_read(struct file *file, char __user *buf,
 	default:
 		break;
 	}
+
+	if (count > debug_rw_buf_size)
+		count = debug_rw_buf_size;
 
 	if (len > count)
 		len = count;
