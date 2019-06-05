@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -453,7 +453,7 @@
 		};
 	};
 
-	bmi160_int1_default: bmi160_int1_default {
+	sensor_int1_default: sensor_int1_default {
 		mux {
 			pins = "gpio81";
 			function = "gpio";
@@ -465,7 +465,7 @@
 		};
 	};
 
-	bmi160_int2_default: bmi160_int2_default {
+	sensor_int2_default: sensor_int2_default {
 		mux {
 			pins = "gpio94";
 			function = "gpio";
@@ -595,7 +595,7 @@
 		compatible = "bosch-sensortec,bmi160";
 		reg = <0x68>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&bmi160_int1_default &bmi160_int2_default>;
+		pinctrl-0 = <&sensor_int1_default &sensor_int2_default>;
 		interrupt-parent = <&tlmm_pinmux>;
 		interrupts = <81 0x2002>;
 		bmi,init-interval = <200>;
