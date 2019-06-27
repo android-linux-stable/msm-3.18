@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1108,7 +1108,7 @@ static int get_args(uint32_t kernel, struct smq_invoke_ctx *ctx)
 	metalen = copylen = (size_t)&ipage[0];
 
 	/* allocate new local rpra buffer */
-	lrpralen = (size_t)&list[0];
+	lrpralen = (u64)(uintptr_t)&list[0];
 	if (lrpralen) {
 		err = fastrpc_buf_alloc(ctx->fl, lrpralen,
 			ctx_attrs, 0, 0, &ctx->lbuf);
